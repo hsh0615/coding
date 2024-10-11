@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 
 function App() {
@@ -8,15 +7,11 @@ function App() {
 
   const handleRegister = async () => {
     try {
-      console.log('Sending registration request to backend...');  // 調試：檢查是否發送了請求
-      console.log('Request body:', { username, password });  // 調試：顯示發送的數據
-
-      const response = await fetch('http://192.168.0.157:5000/register', {
+      const response = await fetch('http://localhost:5050/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
-      console.log('Response status:', response.status);  // 調試：顯示後端返回的 HTTP 狀態碼
       
       if (response.ok) {
         const data = await response.json();
@@ -33,27 +28,61 @@ function App() {
       setMessage('註冊失敗');
     }
   };
-  
 
-const handleLogin = async () => {
-  try {
-    const response = await fetch('http://192.168.0.157:5000/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    const data = await response.json();
-    if (response.ok) {
-      setMessage(`Welcome back, ${data.user.username}`);
-    } else {
+  const handleLogin = async () => {
+    try {
+      const response = await fetch('http://localhost:5050/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setMessage(`Welcome back, ${data.user.username}`);
+      } else {
+        setMessage('Login failed');
+      }
+    } catch (error) {
+      console.error('Error in handleLogin:', error);
       setMessage('Login failed');
     }
-  } catch (error) {
-    console.error('Error in handleLogin:', error);
-    setMessage('Login failed');
-  }
-};
+  };
 
+  const handleMatch = async () => {
+    setMessage('配對中...');
+
+    // 發送配對請求
+    try {
+      await fetch('http://localhost:5050/match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username })
+      });
+    } catch (error) {
+      console.error('Error in handleMatch:', error);
+      setMessage('配對請求失敗');
+      return;
+    }
+
+    // 輪詢配對結果
+    const pollMatchResult = async () => {
+      try {
+        const response = await fetch(`http://localhost:5050/match-result/${username}`);
+        const data = await response.json();
+
+        if (data.message.includes('配對成功')) {
+          setMessage(data.message); // 配對成功，顯示消息
+        } else {
+          setTimeout(pollMatchResult, 5000); // 還在等待，繼續輪詢
+        }
+      } catch (error) {
+        console.error('Error in pollMatchResult:', error);
+        setMessage('配對結果查詢失敗');
+      }
+    };
+
+    pollMatchResult(); // 發送第一次配對結果查詢請求
+  };
 
   return (
     <div>
@@ -62,6 +91,7 @@ const handleLogin = async () => {
       <input placeholder="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} />
       <button onClick={handleRegister}>Register</button>
       <button onClick={handleLogin}>Login</button>
+      <button onClick={handleMatch}>配對</button>
       <p>{message}</p>
     </div>
   );

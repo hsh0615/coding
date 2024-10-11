@@ -3,11 +3,15 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const app = express();
-const port = 5000;
+const port = 5050;
+
+
+let matchingPool = []; // 配對池，用來存放等待配對的用戶
+let matchResults = {}; // 存儲用戶的配對結果
 
 // 使用 CORS 和 bodyParser 中間件
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://192.168.0.157:3000'],
+  origin: ['http://localhost:3001'],
   credentials: true
 }));
 
@@ -80,6 +84,64 @@ app.post('/login', async (req, res) => {
   }
 });
 
+// 新增配對 API
+app.post('/match', (req, res) => {
+  const { username } = req.body;
+
+  // 確保用戶名是有效的
+  if (!username) {
+    return res.status(400).json({ message: '用戶名不能為空' });
+  }
+
+  // 如果該用戶已經在配對池中，返回一條消息，避免重複加入
+  if (matchingPool.includes(username)) {
+    return res.status(400).json({ message: '您已經在等待配對中，請耐心等待' });
+  }
+
+  // 將用戶加入配對池
+  matchingPool.push(username);
+  console.log(`${username} 加入配對池`);
+
+  // 當配對池中有兩個不同的用戶時，進行配對
+  if (matchingPool.length >= 2) {
+    let matchUser;
+
+    // 尋找一個與當前用戶不同的配對對象
+    for (let i = 0; i < matchingPool.length; i++) {
+      if (matchingPool[i] !== username) {
+        matchUser = matchingPool[i];
+        matchingPool.splice(i, 1); // 將該用戶從配對池中移除
+        break;
+      }
+    }
+
+    // 如果找到了一個不同的用戶，進行配對
+    if (matchUser) {
+      matchingPool = matchingPool.filter(user => user !== username); // 從配對池中移除當前用戶
+      console.log(`配對成功：${username} 與 ${matchUser}`);
+
+      // 將配對結果存儲，以便兩位用戶可以查詢
+      matchResults[username] = matchUser;
+      matchResults[matchUser] = username;
+
+      return res.json({ message: `配對成功！配對對象: ${matchUser}` });
+    }
+  }
+
+  // 如果池中只有自己，返回等待配對的消息
+  return res.status(200).json({ message: '等待配對中...' });
+});
+
+// 用戶查詢配對結果的 API
+app.get('/match-result/:username', (req, res) => {
+  const { username } = req.params;
+
+  if (matchResults[username]) {
+    return res.json({ message: `配對成功！配對對象: ${matchResults[username]}` });
+  } else {
+    return res.status(200).json({ message: '等待配對中...' });
+  }
+});
 
 
 app.get('/', (req, res) => {
@@ -99,8 +161,8 @@ sequelize.authenticate()
     console.log('數據庫同步成功。');
 
     // 將 app.listen 放在這裡
-    app.listen(5000, '0.0.0.0', () => {
-      console.log('後端伺服器運行在端口 5000');
+    app.listen(5050, '0.0.0.0', () => {
+      console.log('後端伺服器運行在端口 5050');
     });
   })
   .catch(err => {
